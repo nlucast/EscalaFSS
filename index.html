@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Escala FSS</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0d9488" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Escala FSS" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f3f4f6;min-height:100vh}
+    #app{max-width:480px;margin:0 auto;min-height:100vh;position:relative}
+
+    /* Header */
+    .header{position:fixed;top:0;left:0;right:0;max-width:480px;margin:0 auto;background:#0d9488;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+    .header-text{text-align:center}
+    .header h1{font-size:1.45rem;font-weight:700;line-height:1.1}
+    .header p{font-size:.9rem;color:#ccfbf1;margin-top:3px}
+    .header-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.8rem}
+
+    /* Nav */
+    .bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;border-top:1px solid #e5e7eb;display:flex;z-index:20;box-shadow:0 -2px 8px rgba(0,0,0,.07)}
+    .nav-btn{flex:1;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:.65rem;font-weight:700}
+    .nav-btn.active{color:#0d9488}
+    .nav-btn span.icon{font-size:1.3rem;line-height:1;display:inline-block;padding:3px 10px;border-radius:12px;transition:background .15s}
+    .nav-btn.active span.icon{background:#ccfbf1}
+
+    /* Content */
+    .content{padding-top:78px;padding-bottom:64px}
+    .section{display:none;padding:16px;flex-direction:column;gap:12px}
+    .section.active{display:flex}
+
+    /* Cards */
+    .card{background:#fff;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden}
+    .card-body{padding:16px}
+
+    /* Buttons */
+    .btn{display:block;width:100%;padding:12px;border-radius:16px;font-size:.85rem;font-weight:700;border:none;cursor:pointer;text-align:center;transition:opacity .15s}
+    .btn:active{opacity:.75}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-primary{background:#0d9488;color:#fff}
+    .btn-secondary{background:#f3f4f6;color:#6b7280}
+    .btn-danger{background:#fee2e2;color:#dc2626}
+
+    /* Form */
+    .form-group{display:flex;flex-direction:column;gap:6px}
+    .form-label{font-size:.7rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em}
+    .form-input{border:1.5px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:.875rem;background:#fff;outline:none;width:100%;font-family:inherit}
+    .form-input:focus{border-color:#0d9488}
+    textarea.form-input{resize:vertical;min-height:70px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .form-group.centered .form-label,.form-group.centered .form-input{text-align:center}
+
+    /* Badges */
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap}
+
+    /* Domain cards */
+    .domain-card{background:#fff;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden}
+    .domain-header{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .domain-title{font-size:.85rem;font-weight:700;color:#111;display:flex;align-items:center;gap:8px}
+    .domain-score-badge{width:28px;height:28px;border-radius:50%;background:#f3f4f6;color:#9ca3af;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+    .domain-score-badge.set{background:#0d9488;color:#fff}
+    .domain-edit-btn{background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;color:#9ca3af;padding:4px;flex-shrink:0}
+    .domain-edit-btn:hover{color:#0d9488}
+    .option-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:6px}
+    .option-item{border:1.5px solid #e5e7eb;border-radius:10px;padding:8px 10px;display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:.78rem;line-height:1.35;color:#4b5563;transition:all .15s}
+    .option-item.selected{border-color:#0d9488;background:#f0fdfa;color:#111}
+    .option-num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.72rem;color:#9ca3af}
+    .option-item.selected .option-num{background:#0d9488;color:#fff}
+
+    /* Total card */
+    .total-card{background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;border-radius:16px;padding:18px;text-align:center}
+    .total-card .score{font-size:2.6rem;font-weight:800;line-height:1}
+    .total-card .lbl{font-size:.65rem;color:#ccfbf1;text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+    .total-card .cls{margin-top:10px}
+    .total-card .hint{font-size:.75rem;color:#ccfbf1;margin-top:4px}
+
+    /* Records */
+    .record-card{background:#fff;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden}
+    .record-head{padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer}
+    .record-info{flex:0 0 auto;min-width:0}
+    .record-name{font-size:.9rem;font-weight:700;color:#111;white-space:nowrap}
+    .record-badge{margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+    .record-meta{font-size:.7rem;color:#9ca3af;margin-top:2px}
+    .record-score{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.05rem;color:#fff;flex-shrink:0}
+    .record-arrow{color:#d1d5db;font-size:.9rem;flex-shrink:0}
+    .record-detail{padding:0 16px 16px;display:none;flex-direction:column;gap:6px;border-top:1px solid #f3f4f6}
+    .record-detail.open{display:flex;padding-top:12px}
+    .detail-row{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:#6b7280}
+    .detail-row b{color:#111;text-align:right}
+    .record-actions{display:flex;gap:8px;margin-top:8px}
+    .record-actions .btn{padding:8px}
+
+    /* Empty state */
+    .empty{text-align:center;padding:48px 16px;color:#d1d5db}
+    .empty .ico{font-size:3rem;margin-bottom:8px}
+    .empty p{font-size:.85rem;color:#9ca3af}
+
+    /* Alerts */
+    .alert{padding:12px;border-radius:10px;font-size:.8rem;display:flex;align-items:flex-start;gap:8px}
+    .alert-amber{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+
+    /* Reference table */
+    .ref-intro{font-size:.8rem;color:#4b5563;line-height:1.5}
+    .ref-wrap{overflow-x:auto;border-radius:12px;border:1px solid #e5e7eb}
+    .ref-table{width:100%;border-collapse:collapse;font-size:.68rem;background:#fff}
+    .ref-table th,.ref-table td{border:1px solid #e5e7eb;padding:6px;text-align:left;vertical-align:top}
+    .ref-table th{background:#f0fdfa;color:#0f766e;font-weight:700;white-space:nowrap}
+    .ref-table td:first-child{font-weight:700;color:#111;background:#f9fafb;white-space:nowrap}
+    .cls-legend{display:flex;flex-direction:column;gap:6px}
+    .cls-legend-item{display:flex;align-items:center;justify-content:space-between;font-size:.78rem;padding:8px 10px;border-radius:10px}
+  </style>
+</head>
+<body>
+<div id="js-error-box" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#ef4444;color:#fff;padding:12px;font-size:.8rem;word-break:break-all"></div>
+<div id="app">
+
+  <header class="header">
+    <div class="header-text">
+      <h1>Escala FSS</h1>
+      <p id="tab-label">Evaluación</p>
+    </div>
+    <span class="header-icon">📊</span>
+  </header>
+
+  <main class="content">
+
+    <!-- ═══ EVALUACIÓN ═══ -->
+    <section id="tab-eval" class="section active">
+      <div id="eval-container"></div>
+    </section>
+
+    <!-- ═══ REGISTROS ═══ -->
+    <section id="tab-records" class="section">
+      <div id="records-container"></div>
+    </section>
+
+    <!-- ═══ ESCALA ═══ -->
+    <section id="tab-scale" class="section">
+      <div id="scale-container"></div>
+    </section>
+
+  </main>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+
+</div><!-- #app -->
+
+<script src="xlsx.min.js"></script>
+<script>
+window.onerror = function(msg, src, line, col) {
+  var d = document.getElementById('js-error-box');
+  if (d) { d.style.display='block'; d.textContent = 'ERROR JS: '+msg+' (línea '+line+')'; }
+  return false;
+};
+
+// Polyfill para navegadores móviles antiguos
+if (!String.prototype.padStart) {
+  String.prototype.padStart = function(len, ch) {
+    var s = String(this); ch = ch || ' ';
+    while (s.length < len) s = ch + s;
+    return s;
+  };
+}
+
+// ══════════════════════════════════════════
+//  DATOS DE LA ESCALA FSS
+// ══════════════════════════════════════════
+var FSS_DOMAINS = [
+  { key:'estadoMental', label:'Estado Mental', icon:'🧠', options:[
+    {score:1, text:'Sueño/vigilia normal; respuesta apropiada'},
+    {score:2, text:'Somnoliento pero despertable al ruido/tacto/movimiento y/o períodos de no respuesta social'},
+    {score:3, text:'Letárgico y/o irritable'},
+    {score:4, text:'Mínima activación ante el estímulo (estupor)'},
+    {score:5, text:'No responde y/o coma y/o vegetativo'}
+  ]},
+  { key:'sensorial', label:'Sensorial', icon:'👁️', options:[
+    {score:1, text:'Audición y visión intactas y respuesta al tacto'},
+    {score:2, text:'Sospecha de pérdida de audición o de visión'},
+    {score:3, text:'No reacciona a estímulos auditivos o no reacciona a estímulos visuales'},
+    {score:4, text:'No reacciona a estímulos auditivos y no reacciona a estímulos visuales'},
+    {score:5, text:'Respuesta anormal al dolor o al tacto'}
+  ]},
+  { key:'comunicacion', label:'Comunicación', icon:'🗣️', options:[
+    {score:1, text:'Vocalizaciones no relacionadas con el llanto apropiadas, expresividad facial interactiva o gestos'},
+    {score:2, text:'Vocalización disminuida, expresión facial disminuida y/o respuesta social disminuida'},
+    {score:3, text:'Ausencia de conducta para llamar la atención'},
+    {score:4, text:'No manifiesta incomodidad'},
+    {score:5, text:'Ausencia de comunicación'}
+  ]},
+  { key:'funcionMotora', label:'Función Motora', icon:'🏃', options:[
+    {score:1, text:'Movimientos corporales coordinados, control muscular normal, y conciencia de la acción y de por qué se la realiza'},
+    {score:2, text:'1 extremidad funcionalmente afectada'},
+    {score:3, text:'2 o más extremidades funcionalmente afectadas'},
+    {score:4, text:'Pobre control cefálico'},
+    {score:5, text:'Espasticidad difusa, parálisis, postura de descerebración/decorticación'}
+  ]},
+  { key:'alimentacion', label:'Alimentación', icon:'🍽️', options:[
+    {score:1, text:'Todos los alimentos tomados por vía oral con ayuda apropiada para la edad'},
+    {score:2, text:'NPO o necesidad de ayuda inapropiada para la edad con la alimentación'},
+    {score:3, text:'Alimentación oral y por sonda'},
+    {score:4, text:'Nutrición parenteral con alimentación oral o por sonda'},
+    {score:5, text:'Toda nutrición parenteral'}
+  ]},
+  { key:'respiratorio', label:'Respiratorio', icon:'💨', options:[
+    {score:1, text:'Aire ambiente y sin soporte ni ayudas artificiales'},
+    {score:2, text:'Oxígeno y/o aspiración'},
+    {score:3, text:'Traqueostomía'},
+    {score:4, text:'CPAP durante todo o parte del día y/o soporte ventilatorio mecánico durante parte del día'},
+    {score:5, text:'Soporte ventilatorio mecánico durante todo el día y la noche'}
+  ]}
+];
+
+var CLASS_LEVELS = [
+  {min:6,  max:7,  label:'Normal',                  cls:'good',    bg:'#d1fae5', fg:'#065f46', circle:'#059669'},
+  {min:8,  max:9,  label:'Disfunción leve',         cls:'mild',    bg:'#dbeafe', fg:'#1d4ed8', circle:'#2563eb'},
+  {min:10, max:15, label:'Disfunción moderada',     cls:'moderate',bg:'#fef3c7', fg:'#92400e', circle:'#d97706'},
+  {min:16, max:21, label:'Disfunción severa',       cls:'severe',  bg:'#ffedd5', fg:'#9a3412', circle:'#ea580c'},
+  {min:22, max:30, label:'Disfunción muy severa',   cls:'vsevere', bg:'#fee2e2', fg:'#991b1b', circle:'#dc2626'}
+];
+
+// ══════════════════════════════════════════
+//  ESTADO
+// ══════════════════════════════════════════
+var TABS = [
+  {id:'eval',    label:'Evaluación', icon:'📝'},
+  {id:'records', label:'Registros',  icon:'📋'},
+  {id:'scale',   label:'Escala',     icon:'📖'}
+];
+
+var state = {
+  records: safeJSON('fss_records', []),
+  activeTab: 'eval',
+  form: defaultForm(),
+  expandedId: null
+};
+
+function safeJSON(key, def) {
+  try { return JSON.parse(localStorage.getItem(key)) || def; } catch(e) { return def; }
+}
+function save(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function escHtml(s) {
+  return String(s==null?'':s).replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function defaultForm() {
+  var d = new Date(), ds = d.toISOString().slice(0,10);
+  return {
+    nombre:'', dni:'', fecha:ds, observaciones:'',
+    scores:{ estadoMental:null, sensorial:null, comunicacion:null, funcionMotora:null, alimentacion:null, respiratorio:null },
+    editing:{}
+  };
+}
+
+// ══════════════════════════════════════════
+//  CÁLCULOS
+// ══════════════════════════════════════════
+function computeTotal(scores) {
+  var total = 0;
+  for (var i=0;i<FSS_DOMAINS.length;i++) {
+    var v = scores[FSS_DOMAINS[i].key];
+    if (!v) return null;
+    total += v;
+  }
+  return total;
+}
+function classify(total) {
+  for (var i=0;i<CLASS_LEVELS.length;i++) {
+    if (total >= CLASS_LEVELS[i].min && total <= CLASS_LEVELS[i].max) return CLASS_LEVELS[i];
+  }
+  return CLASS_LEVELS[CLASS_LEVELS.length-1];
+}
+function fmtDate(ds) {
+  var p = ds.split('-');
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
+
+// ══════════════════════════════════════════
+//  RENDER — NAV
+// ══════════════════════════════════════════
+function renderNav() {
+  var html = '';
+  TABS.forEach(function(t) {
+    var active = t.id===state.activeTab ? ' active' : '';
+    html += '<button class="nav-btn'+active+'" onclick="setTab(\''+t.id+'\')"><span class="icon">'+t.icon+'</span>'+t.label+'</button>';
+  });
+  document.getElementById('bottom-nav').innerHTML = html;
+}
+function setTab(id) {
+  state.activeTab = id;
+  document.getElementById('tab-label').textContent = TABS.filter(function(t){return t.id===id;})[0].label;
+  ['eval','records','scale'].forEach(function(s) {
+    document.getElementById('tab-'+s).classList.toggle('active', s===id);
+  });
+  renderNav();
+  renderActiveTab();
+}
+function renderActiveTab() {
+  if (state.activeTab==='eval') renderEval();
+  else if (state.activeTab==='records') renderRecords();
+  else renderScale();
+}
+
+// ══════════════════════════════════════════
+//  RENDER — EVALUACIÓN
+// ══════════════════════════════════════════
+function renderEval() {
+  var f = state.form;
+  var html = '';
+
+  html += '<div class="card"><div class="card-body" style="display:flex;flex-direction:column;gap:12px">';
+  html += '<div class="form-group centered"><label class="form-label">Nombre del paciente</label>'+
+          '<input class="form-input" type="text" placeholder="Apellido y nombre" value="'+escHtml(f.nombre)+'" onchange="formSet(\'nombre\',this.value)"></div>';
+  html += '<div class="grid-2">';
+  html += '<div class="form-group"><label class="form-label">DNI / N° Hist. Clínica</label>'+
+          '<input class="form-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12345678" value="'+escHtml(f.dni)+'" onchange="formSet(\'dni\',this.value)"></div>';
+  html += '<div class="form-group"><label class="form-label">Fecha</label>'+
+          '<input class="form-input" type="text" inputmode="numeric" pattern="[0-9/]*" maxlength="10" placeholder="dd/mm/aaaa" value="'+fmtDate(f.fecha)+'" oninput="formatDateInput(this)" onchange="setDate(this.value)"></div>';
+  html += '</div></div></div>';
+
+  FSS_DOMAINS.forEach(function(dom) {
+    var sel = f.scores[dom.key];
+    var expanded = !sel || f.editing[dom.key];
+    html += '<div class="domain-card">';
+    html += '<div class="domain-header"><div class="domain-title">'+dom.icon+' '+dom.label+'</div>'+
+            '<div style="display:flex;align-items:center;gap:4px">'+
+            '<div class="domain-score-badge'+(sel?' set':'')+'">'+(sel||'–')+'</div>';
+    if (sel && !expanded) {
+      html += '<button class="domain-edit-btn" onclick="editDomain(\''+dom.key+'\')" title="Editar">✏️</button>';
+    }
+    html += '</div></div>';
+    if (expanded) {
+      html += '<div class="option-list">';
+      dom.options.forEach(function(opt) {
+        var selected = sel===opt.score;
+        html += '<div class="option-item'+(selected?' selected':'')+'" onclick="selectScore(\''+dom.key+'\','+opt.score+')">'+
+                '<div class="option-num">'+opt.score+'</div><div>'+escHtml(opt.text)+'</div></div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+
+  var total = computeTotal(f.scores);
+  if (total===null) {
+    html += '<div class="total-card">';
+    html += '<div class="score">—</div><div class="lbl">Puntaje total</div>'+
+            '<div class="hint">Completá los 6 dominios para calcular el puntaje</div>';
+    html += '</div>';
+  } else {
+    var c = classify(total);
+    html += '<div class="total-card" style="background:'+c.bg+';color:'+c.fg+'">';
+    html += '<div class="score" style="color:'+c.fg+'">'+total+'</div><div class="lbl" style="color:'+c.fg+'">Puntaje total (6-30)</div>'+
+            '<div class="cls" style="color:'+c.fg+';font-weight:700;font-size:.9rem">'+c.label+'</div>';
+    html += '</div>';
+  }
+
+  html += '<div class="form-group"><label class="form-label">Observaciones</label>'+
+          '<textarea class="form-input" placeholder="Notas adicionales (opcional)" onchange="formSet(\'observaciones\',this.value)">'+escHtml(f.observaciones)+'</textarea></div>';
+
+  html += '<button class="btn btn-primary" id="btn-save" onclick="saveRecord()"'+(total===null?' disabled':'')+'>💾 Guardar evaluación</button>';
+  html += '<button class="btn btn-secondary" onclick="resetForm()">Limpiar formulario</button>';
+
+  document.getElementById('eval-container').innerHTML = html;
+}
+
+function formSet(key, value) {
+  state.form[key] = value;
+  renderEval();
+}
+// Auto-inserta las barras mientras se escribe la fecha (dd/mm/aaaa), solo dígitos
+function formatDateInput(el) {
+  var d = el.value.replace(/\D/g, '').slice(0, 8);
+  var out = d.slice(0, 2);
+  if (d.length >= 3) out += '/' + d.slice(2, 4);
+  if (d.length >= 5) out += '/' + d.slice(4, 8);
+  el.value = out;
+}
+// Convierte dd/mm/aaaa -> aaaa-mm-dd (ISO) y lo guarda; si es inválida, conserva la anterior
+function setDate(str) {
+  var m = String(str).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    var dd = m[1].padStart(2, '0'), mm = m[2].padStart(2, '0'), yyyy = m[3];
+    var dt = new Date(+yyyy, +mm - 1, +dd);
+    if (dt.getFullYear() == +yyyy && dt.getMonth() == +mm - 1 && dt.getDate() == +dd) {
+      state.form.fecha = yyyy + '-' + mm + '-' + dd;
+    }
+  }
+  renderEval();
+}
+function selectScore(key, score) {
+  state.form.scores[key] = score;
+  delete state.form.editing[key];
+  renderEval();
+}
+function editDomain(key) {
+  state.form.editing[key] = true;
+  renderEval();
+}
+function resetForm() {
+  if (!confirm('¿Limpiar el formulario actual?')) return;
+  state.form = defaultForm();
+  renderEval();
+}
+function saveRecord() {
+  var f = state.form;
+  if (!f.nombre.trim()) { alert('Ingresá el nombre del paciente.'); return; }
+  var total = computeTotal(f.scores);
+  if (total===null) { alert('Completá los 6 dominios de la escala.'); return; }
+  var c = classify(total);
+  state.records.unshift({
+    id: uid(),
+    createdAt: Date.now(),
+    fecha: f.fecha,
+    nombre: f.nombre.trim(),
+    dni: f.dni.trim(),
+    scores: {
+      estadoMental: f.scores.estadoMental,
+      sensorial: f.scores.sensorial,
+      comunicacion: f.scores.comunicacion,
+      funcionMotora: f.scores.funcionMotora,
+      alimentacion: f.scores.alimentacion,
+      respiratorio: f.scores.respiratorio
+    },
+    total: total,
+    clasificacion: c.label,
+    clsKey: c.cls,
+    observaciones: f.observaciones.trim()
+  });
+  save('fss_records', state.records);
+  state.form = defaultForm();
+  setTab('records');
+}
+
+// ══════════════════════════════════════════
+//  RENDER — REGISTROS
+// ══════════════════════════════════════════
+function renderRecords() {
+  var html = '';
+
+  if (!state.records.length) {
+    html += '<div class="empty"><div class="ico">📋</div><p>Todavía no guardaste evaluaciones.<br>Completá la pestaña Evaluación para agregar la primera.</p></div>';
+    document.getElementById('records-container').innerHTML = html;
+    return;
+  }
+
+  html += '<button class="btn btn-primary" onclick="exportExcel()">⬇️ Exportar a Excel</button>';
+
+  state.records.forEach(function(r) {
+    var c = classify(r.total);
+    var open = state.expandedId===r.id;
+    html += '<div class="record-card">';
+    html += '<div class="record-head" onclick="toggleExpand(\''+r.id+'\')">';
+    html += '<div class="record-score" style="background:'+c.circle+'">'+r.total+'</div>';
+    html += '<div class="record-info"><div class="record-name">'+escHtml(r.nombre)+'</div>'+
+            '<div class="record-meta">'+fmtDate(r.fecha)+(r.dni?' · DNI/HC '+escHtml(r.dni):'')+'</div></div>';
+    html += '<span class="badge record-badge" style="background:'+c.bg+';color:'+c.fg+'">'+r.clasificacion+'</span>';
+    html += '<div class="record-arrow">'+(open?'▾':'▸')+'</div>';
+    html += '</div>';
+
+    html += '<div class="record-detail'+(open?' open':'')+'">';
+    FSS_DOMAINS.forEach(function(dom) {
+      html += '<div class="detail-row"><span>'+dom.icon+' '+dom.label+'</span><b>'+r.scores[dom.key]+'</b></div>';
+    });
+    if (r.observaciones) {
+      html += '<div class="detail-row" style="flex-direction:column;gap:2px"><span>Observaciones</span><b style="text-align:left;font-weight:500">'+escHtml(r.observaciones)+'</b></div>';
+    }
+    html += '<div class="record-actions"><button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">🗑️ Eliminar</button></div>';
+    html += '</div>';
+
+    html += '</div>';
+  });
+
+  document.getElementById('records-container').innerHTML = html;
+}
+
+function toggleExpand(id) {
+  state.expandedId = state.expandedId===id ? null : id;
+  renderRecords();
+}
+function deleteRecord(id) {
+  if (!confirm('¿Eliminar este registro? Esta acción no se puede deshacer.')) return;
+  state.records = state.records.filter(function(r){ return r.id!==id; });
+  if (state.expandedId===id) state.expandedId = null;
+  save('fss_records', state.records);
+  renderRecords();
+}
+function exportExcel() {
+  if (!state.records.length) { alert('No hay registros para exportar.'); return; }
+  var header = ['Fecha','Nombre','DNI / N° HC','Estado Mental','Sensorial','Comunicación','Función Motora','Alimentación','Respiratorio','Puntaje Total','Clasificación','Observaciones'];
+  var rows = state.records.map(function(r) {
+    return [
+      fmtDate(r.fecha), r.nombre, r.dni,
+      r.scores.estadoMental, r.scores.sensorial, r.scores.comunicacion,
+      r.scores.funcionMotora, r.scores.alimentacion, r.scores.respiratorio,
+      r.total, r.clasificacion, r.observaciones
+    ];
+  });
+  var ws = XLSX.utils.aoa_to_sheet([header].concat(rows));
+  ws['!cols'] = [{wch:11},{wch:24},{wch:14},{wch:12},{wch:10},{wch:13},{wch:14},{wch:12},{wch:12},{wch:8},{wch:20},{wch:30}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Evaluaciones FSS');
+  XLSX.writeFile(wb, 'Escala_FSS_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// ══════════════════════════════════════════
+//  RENDER — ESCALA (referencia)
+// ══════════════════════════════════════════
+function renderScale() {
+  var html = '';
+  html += '<div class="ref-intro">La <b>Escala de Estado Funcional (FSS)</b> evalúa 6 dominios. Cada uno se puntúa de '+
+          '<b>1 (normal)</b> a <b>5 (disfunción muy severa)</b>. El puntaje total es la suma de los 6 dominios y va de <b>6 a 30</b>.</div>';
+
+  html += '<div class="ref-wrap"><table class="ref-table"><thead><tr><th>Dominio</th>'+
+          '<th>1 · Normal</th><th>2 · Disf. leve</th><th>3 · Disf. moderada</th><th>4 · Disf. severa</th><th>5 · Disf. muy severa</th></tr></thead><tbody>';
+  FSS_DOMAINS.forEach(function(dom) {
+    html += '<tr><td>'+dom.icon+' '+dom.label+'</td>';
+    dom.options.forEach(function(opt) {
+      html += '<td>'+escHtml(opt.text)+'</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '<div class="card"><div class="card-body cls-legend">';
+  html += '<div class="form-label" style="margin-bottom:2px">Clasificación por puntaje total</div>';
+  CLASS_LEVELS.forEach(function(c) {
+    html += '<div class="cls-legend-item" style="background:'+c.bg+';color:'+c.fg+'">'+
+            '<span>'+c.label+'</span><b>'+c.min+'–'+c.max+'</b></div>';
+  });
+  html += '</div></div>';
+
+  document.getElementById('scale-container').innerHTML = html;
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+renderNav();
+renderEval();
+
+// Service Worker (offline / instalable)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
