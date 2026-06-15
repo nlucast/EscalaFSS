@@ -151,6 +151,7 @@
 </div><!-- #app -->
 
 <script src="xlsx.min.js"></script>
+<script src="exceljs.min.js"></script>
 <script>
 window.onerror = function(msg, src, line, col) {
   var d = document.getElementById('js-error-box');
@@ -320,9 +321,9 @@ function renderEval() {
   html += '<div class="form-group centered"><label class="form-label">Nombre del paciente</label>'+
           '<input class="form-input" type="text" placeholder="Apellido y nombre" value="'+escHtml(f.nombre)+'" onchange="formSet(\'nombre\',this.value)"></div>';
   html += '<div class="grid-2">';
-  html += '<div class="form-group"><label class="form-label">DNI / N° Hist. Clínica</label>'+
+  html += '<div class="form-group centered"><label class="form-label">DNI / N° Hist. Clínica</label>'+
           '<input class="form-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12345678" value="'+escHtml(f.dni)+'" onchange="formSet(\'dni\',this.value)"></div>';
-  html += '<div class="form-group"><label class="form-label">Fecha</label>'+
+  html += '<div class="form-group centered"><label class="form-label">Fecha</label>'+
           '<input class="form-input" type="text" inputmode="numeric" pattern="[0-9/]*" maxlength="10" placeholder="dd/mm/aaaa" value="'+fmtDate(f.fecha)+'" oninput="formatDateInput(this)" onchange="setDate(this.value)"></div>';
   html += '</div></div></div>';
 
@@ -452,7 +453,10 @@ function renderRecords() {
     return;
   }
 
-  html += '<button class="btn btn-primary" onclick="exportExcel()">⬇️ Exportar a Excel</button>';
+  html += '<div class="grid-2">'+
+          '<button class="btn btn-primary" onclick="exportFicha()">⬇️ Fichas</button>'+
+          '<button class="btn btn-secondary" onclick="exportExcel()">⬇️ Tabla</button>'+
+          '</div>';
 
   state.records.forEach(function(r) {
     var c = classify(r.total);
@@ -509,6 +513,104 @@ function exportExcel() {
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Evaluaciones FSS');
   XLSX.writeFile(wb, 'Escala_FSS_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// Exporta en formato "ficha" (una ficha enmarcada por paciente, apiladas en una hoja)
+function exportFicha() {
+  if (!state.records.length) { alert('No hay registros para exportar.'); return; }
+  var wb = new ExcelJS.Workbook();
+  var ws = wb.addWorksheet('Evaluaciones FSS');
+  ws.getColumn(2).width = 15;
+  ws.getColumn(3).width = 18;
+
+  var thin = {style:'thin'}, medium = {style:'medium'};
+  var FONT = {name:'Calibri', size:12};
+  var FONT_BOLD = {name:'Calibri', size:14, bold:true};
+  var FONT_ITALIC = {name:'Calibri', size:11, italic:true};
+  var FICHA_ROWS = 16; // alto de cada ficha
+
+  var r = 1;
+  state.records.forEach(function(rec) {
+    var start = r;
+
+    // Helper: fila etiqueta (col B) + valor (col C)
+    function pair(label, value, opt) {
+      opt = opt || {};
+      var b = ws.getCell(r, 2), c = ws.getCell(r, 3);
+      b.value = label; c.value = value;
+      b.font = opt.bold ? FONT_BOLD : FONT;
+      c.font = opt.bold ? FONT_BOLD : FONT;
+      b.alignment = {vertical:'middle', horizontal:'left'};
+      c.alignment = {vertical:'middle', horizontal: opt.left ? 'left' : 'center'};
+      r++;
+    }
+    // Helper: fila combinada B:C (un solo texto centrado)
+    function merged(value, font) {
+      ws.mergeCells(r, 2, r, 3);
+      var cell = ws.getCell(r, 2);
+      cell.value = value;
+      cell.font = font;
+      cell.alignment = {vertical:'middle', horizontal:'center'};
+      r++;
+    }
+
+    pair('Nombre', rec.nombre, {bold:true});
+    pair('DNI / N° HC', rec.dni);
+    pair('Fecha', fmtDate(rec.fecha));
+    pair('Estado Mental', rec.scores.estadoMental);
+    pair('Sensorial', rec.scores.sensorial);
+    pair('Comunicación', rec.scores.comunicacion);
+    pair('Función Motora', rec.scores.funcionMotora);
+    pair('Alimentación', rec.scores.alimentacion);
+    pair('Respiratorio', rec.scores.respiratorio);
+    pair('Puntaje Total', rec.total, {bold:true});
+    merged(rec.clasificacion, FONT_BOLD);
+    merged('Observaciones', FONT_ITALIC);
+
+    // Área de observaciones: 4 filas combinadas B:C
+    ws.mergeCells(start+12, 2, start+15, 3);
+    var obs = ws.getCell(start+12, 2);
+    obs.value = rec.observaciones || '';
+    obs.font = FONT;
+    obs.alignment = {vertical:'top', horizontal:'left', wrapText:true};
+    r = start + FICHA_ROWS;
+
+    // Bordes: caja con borde grueso exterior y líneas finas internas.
+    // Filas 0-9: dos columnas con divisor fino B|C.
+    // En celdas combinadas hay que escribir SOLO la celda maestra (la esclava
+    // sobrescribiría su estilo), con el perímetro completo (left+right medium).
+    for (var i=0; i<=9; i++) {
+      var row = start + i;
+      var top = (i===0) ? medium : thin;
+      ws.getCell(row, 2).border = {top:top, bottom:thin, left:medium, right:thin};
+      ws.getCell(row, 3).border = {top:top, bottom:thin, left:thin, right:medium};
+    }
+    // Fila 10: Clasificación (combinada B:C)
+    ws.getCell(start+10, 2).border = {top:thin, bottom:thin, left:medium, right:medium};
+    // Fila 11: "Observaciones" (combinada B:C)
+    ws.getCell(start+11, 2).border = {top:thin, bottom:thin, left:medium, right:medium};
+    // Filas 12-15: área de observaciones (combinada B13:C16) — borde inferior grueso
+    ws.getCell(start+12, 2).border = {top:thin, bottom:medium, left:medium, right:medium};
+
+    // Alturas de fila
+    ws.getRow(start).height = 20;     // título
+    ws.getRow(start+9).height = 19;   // puntaje total
+
+    // Fila en blanco de separación entre fichas
+    r++;
+  });
+
+  wb.xlsx.writeBuffer().then(function(buf) {
+    var blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Escala_FSS_ficha_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  }).catch(function(e) {
+    alert('Error al generar el Excel: '+e.message);
+  });
 }
 
 // ══════════════════════════════════════════

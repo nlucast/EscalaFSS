@@ -2,3 +2,5 @@
 serve.ps1
 .claude/
 *.pdf
+*.xlsx
+SESION_EXPORT.md
