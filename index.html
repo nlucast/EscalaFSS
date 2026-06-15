@@ -455,7 +455,7 @@ function renderRecords() {
 
   html += '<div class="grid-2">'+
           '<button class="btn btn-primary" onclick="exportFicha()">⬇️ Fichas</button>'+
-          '<button class="btn btn-secondary" onclick="exportExcel()">⬇️ Tabla</button>'+
+          '<button class="btn btn-primary" onclick="exportExcel()">⬇️ Tabla</button>'+
           '</div>';
 
   state.records.forEach(function(r) {
@@ -483,6 +483,8 @@ function renderRecords() {
     html += '</div>';
   });
 
+  html += '<button class="btn btn-danger" style="margin-top:8px" onclick="deleteAllRecords()">🗑️ Borrar todos los registros</button>';
+
   document.getElementById('records-container').innerHTML = html;
 }
 
@@ -494,6 +496,13 @@ function deleteRecord(id) {
   if (!confirm('¿Eliminar este registro? Esta acción no se puede deshacer.')) return;
   state.records = state.records.filter(function(r){ return r.id!==id; });
   if (state.expandedId===id) state.expandedId = null;
+  save('fss_records', state.records);
+  renderRecords();
+}
+function deleteAllRecords() {
+  if (!confirm('¿Borrar TODOS los registros ('+state.records.length+')? Esta acción no se puede deshacer.\n\nSugerencia: exportá a Excel antes como respaldo.')) return;
+  state.records = [];
+  state.expandedId = null;
   save('fss_records', state.records);
   renderRecords();
 }
