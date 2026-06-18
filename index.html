@@ -55,6 +55,17 @@
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .form-group.centered .form-label,.form-group.centered .form-input{text-align:center}
 
+    /* Selector Ingreso/Egreso (segmentado) */
+    .seg{display:flex;gap:8px}
+    .seg-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid #e5e7eb;background:#fff;font-size:.85rem;font-weight:700;color:#9ca3af;cursor:pointer;font-family:inherit}
+    .seg-btn.active-ing{background:#dbeafe;border-color:#2563eb;color:#1d4ed8}
+    .seg-btn.active-egr{background:#ccfbf1;border-color:#0d9488;color:#0f766e}
+
+    /* Chip Ingreso/Egreso en tarjetas */
+    .tipo-chip{display:inline-block;padding:1px 7px;border-radius:20px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-right:4px}
+    .tipo-ing{background:#dbeafe;color:#1d4ed8}
+    .tipo-egr{background:#ccfbf1;color:#0f766e}
+
     /* Badges */
     .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap}
 
@@ -255,7 +266,7 @@ function escHtml(s) {
 function defaultForm() {
   var d = new Date(), ds = d.toISOString().slice(0,10);
   return {
-    nombre:'', dni:'', fecha:ds, observaciones:'',
+    nombre:'', dni:'', fecha:ds, tipo:'ingreso', observaciones:'',
     scores:{ estadoMental:null, sensorial:null, comunicacion:null, funcionMotora:null, alimentacion:null, respiratorio:null },
     editing:{}
   };
@@ -283,6 +294,7 @@ function fmtDate(ds) {
   var p = ds.split('-');
   return p[2]+'/'+p[1]+'/'+p[0];
 }
+function tipoLabel(r) { return r.tipo==='egreso' ? 'Egreso' : 'Ingreso'; }
 
 // ══════════════════════════════════════════
 //  RENDER — NAV
@@ -325,7 +337,13 @@ function renderEval() {
           '<input class="form-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12345678" value="'+escHtml(f.dni)+'" onchange="formSet(\'dni\',this.value)"></div>';
   html += '<div class="form-group centered"><label class="form-label">Fecha</label>'+
           '<input class="form-input" type="text" inputmode="numeric" pattern="[0-9/]*" maxlength="10" placeholder="dd/mm/aaaa" value="'+fmtDate(f.fecha)+'" oninput="formatDateInput(this)" onchange="setDate(this.value)"></div>';
-  html += '</div></div></div>';
+  html += '</div>';
+  html += '<div class="form-group centered"><label class="form-label">Tipo de evaluación</label>'+
+          '<div class="seg">'+
+          '<button type="button" class="seg-btn'+(f.tipo==='ingreso'?' active-ing':'')+'" onclick="setTipo(\'ingreso\')">📥 Ingreso</button>'+
+          '<button type="button" class="seg-btn'+(f.tipo==='egreso'?' active-egr':'')+'" onclick="setTipo(\'egreso\')">📤 Egreso</button>'+
+          '</div></div>';
+  html += '</div></div>';
 
   FSS_DOMAINS.forEach(function(dom) {
     var sel = f.scores[dom.key];
@@ -406,6 +424,10 @@ function editDomain(key) {
   state.form.editing[key] = true;
   renderEval();
 }
+function setTipo(t) {
+  state.form.tipo = t;
+  renderEval();
+}
 function resetForm() {
   if (!confirm('¿Limpiar el formulario actual?')) return;
   state.form = defaultForm();
@@ -421,6 +443,7 @@ function saveRecord() {
     id: uid(),
     createdAt: Date.now(),
     fecha: f.fecha,
+    tipo: f.tipo || 'ingreso',
     nombre: f.nombre.trim(),
     dni: f.dni.trim(),
     scores: {
@@ -458,34 +481,41 @@ function renderRecords() {
           '<button class="btn btn-primary" onclick="exportExcel()">⬇️ Tabla</button>'+
           '</div>';
 
-  state.records.forEach(function(r) {
-    var c = classify(r.total);
-    var open = state.expandedId===r.id;
-    html += '<div class="record-card">';
-    html += '<div class="record-head" onclick="toggleExpand(\''+r.id+'\')">';
-    html += '<div class="record-score" style="background:'+c.circle+'">'+r.total+'</div>';
-    html += '<div class="record-info"><div class="record-name">'+escHtml(r.nombre)+'</div>'+
-            '<div class="record-meta">'+fmtDate(r.fecha)+(r.dni?' · DNI/HC '+escHtml(r.dni):'')+'</div></div>';
-    html += '<span class="badge record-badge" style="background:'+c.bg+';color:'+c.fg+'">'+r.clasificacion+'</span>';
-    html += '<div class="record-arrow">'+(open?'▾':'▸')+'</div>';
-    html += '</div>';
-
-    html += '<div class="record-detail'+(open?' open':'')+'">';
-    FSS_DOMAINS.forEach(function(dom) {
-      html += '<div class="detail-row"><span>'+dom.icon+' '+dom.label+'</span><b>'+r.scores[dom.key]+'</b></div>';
-    });
-    if (r.observaciones) {
-      html += '<div class="detail-row" style="flex-direction:column;gap:2px"><span>Observaciones</span><b style="text-align:left;font-weight:500">'+escHtml(r.observaciones)+'</b></div>';
-    }
-    html += '<div class="record-actions"><button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">🗑️ Eliminar</button></div>';
-    html += '</div>';
-
-    html += '</div>';
-  });
+  state.records.forEach(function(r) { html += renderRecordCard(r); });
 
   html += '<button class="btn btn-danger" style="margin-top:8px" onclick="deleteAllRecords()">🗑️ Borrar todos los registros</button>';
 
   document.getElementById('records-container').innerHTML = html;
+}
+
+function recTipo(r) { return r.tipo==='egreso' ? 'egreso' : 'ingreso'; }
+
+// Tarjeta individual de una evaluación (con chip Ingreso/Egreso)
+function renderRecordCard(r) {
+  var c = classify(r.total);
+  var open = state.expandedId===r.id;
+  var tipo = recTipo(r);
+  var chip = '<span class="tipo-chip tipo-'+(tipo==='egreso'?'egr':'ing')+'">'+(tipo==='egreso'?'Egreso':'Ingreso')+'</span>';
+  var html = '<div class="record-card">';
+  html += '<div class="record-head" onclick="toggleExpand(\''+r.id+'\')">';
+  html += '<div class="record-score" style="background:'+c.circle+'">'+r.total+'</div>';
+  html += '<div class="record-info"><div class="record-name">'+escHtml(r.nombre)+'</div>'+
+          '<div class="record-meta">'+chip+fmtDate(r.fecha)+(r.dni?' · DNI/HC '+escHtml(r.dni):'')+'</div></div>';
+  html += '<span class="badge record-badge" style="background:'+c.bg+';color:'+c.fg+'">'+r.clasificacion+'</span>';
+  html += '<div class="record-arrow">'+(open?'▾':'▸')+'</div>';
+  html += '</div>';
+
+  html += '<div class="record-detail'+(open?' open':'')+'">';
+  FSS_DOMAINS.forEach(function(dom) {
+    html += '<div class="detail-row"><span>'+dom.icon+' '+dom.label+'</span><b>'+r.scores[dom.key]+'</b></div>';
+  });
+  if (r.observaciones) {
+    html += '<div class="detail-row" style="flex-direction:column;gap:2px"><span>Observaciones</span><b style="text-align:left;font-weight:500">'+escHtml(r.observaciones)+'</b></div>';
+  }
+  html += '<div class="record-actions"><button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">🗑️ Eliminar</button></div>';
+  html += '</div>';
+  html += '</div>';
+  return html;
 }
 
 function toggleExpand(id) {
@@ -508,17 +538,17 @@ function deleteAllRecords() {
 }
 function exportExcel() {
   if (!state.records.length) { alert('No hay registros para exportar.'); return; }
-  var header = ['Fecha','Nombre','DNI / N° HC','Estado Mental','Sensorial','Comunicación','Función Motora','Alimentación','Respiratorio','Puntaje Total','Clasificación','Observaciones'];
+  var header = ['Fecha','Nombre','DNI / N° HC','Tipo','Estado Mental','Sensorial','Comunicación','Función Motora','Alimentación','Respiratorio','Puntaje Total','Clasificación','Observaciones'];
   var rows = state.records.map(function(r) {
     return [
-      fmtDate(r.fecha), r.nombre, r.dni,
+      fmtDate(r.fecha), r.nombre, r.dni, tipoLabel(r),
       r.scores.estadoMental, r.scores.sensorial, r.scores.comunicacion,
       r.scores.funcionMotora, r.scores.alimentacion, r.scores.respiratorio,
       r.total, r.clasificacion, r.observaciones
     ];
   });
   var ws = XLSX.utils.aoa_to_sheet([header].concat(rows));
-  ws['!cols'] = [{wch:11},{wch:24},{wch:14},{wch:12},{wch:10},{wch:13},{wch:14},{wch:12},{wch:12},{wch:8},{wch:20},{wch:30}];
+  ws['!cols'] = [{wch:11},{wch:24},{wch:14},{wch:9},{wch:12},{wch:10},{wch:13},{wch:14},{wch:12},{wch:12},{wch:8},{wch:20},{wch:30}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Evaluaciones FSS');
   XLSX.writeFile(wb, 'Escala_FSS_'+new Date().toISOString().slice(0,10)+'.xlsx');
@@ -536,7 +566,7 @@ function exportFicha() {
   var FONT = {name:'Calibri', size:12};
   var FONT_BOLD = {name:'Calibri', size:14, bold:true};
   var FONT_ITALIC = {name:'Calibri', size:11, italic:true};
-  var FICHA_ROWS = 16; // alto de cada ficha
+  var FICHA_ROWS = 17; // alto de cada ficha
 
   var r = 1;
   state.records.forEach(function(rec) {
@@ -566,6 +596,7 @@ function exportFicha() {
     pair('Nombre', rec.nombre, {bold:true});
     pair('DNI / N° HC', rec.dni);
     pair('Fecha', fmtDate(rec.fecha));
+    pair('Tipo', tipoLabel(rec));
     pair('Estado Mental', rec.scores.estadoMental);
     pair('Sensorial', rec.scores.sensorial);
     pair('Comunicación', rec.scores.comunicacion);
@@ -576,34 +607,34 @@ function exportFicha() {
     merged(rec.clasificacion, FONT_BOLD);
     merged('Observaciones', FONT_ITALIC);
 
-    // Área de observaciones: 4 filas combinadas B:C
-    ws.mergeCells(start+12, 2, start+15, 3);
-    var obs = ws.getCell(start+12, 2);
+    // Área de observaciones: 4 filas combinadas B:C (start+13 .. start+16)
+    ws.mergeCells(start+13, 2, start+16, 3);
+    var obs = ws.getCell(start+13, 2);
     obs.value = rec.observaciones || '';
     obs.font = FONT;
     obs.alignment = {vertical:'top', horizontal:'left', wrapText:true};
     r = start + FICHA_ROWS;
 
     // Bordes: caja con borde grueso exterior y líneas finas internas.
-    // Filas 0-9: dos columnas con divisor fino B|C.
+    // Filas 0-10: dos columnas con divisor fino B|C.
     // En celdas combinadas hay que escribir SOLO la celda maestra (la esclava
     // sobrescribiría su estilo), con el perímetro completo (left+right medium).
-    for (var i=0; i<=9; i++) {
+    for (var i=0; i<=10; i++) {
       var row = start + i;
       var top = (i===0) ? medium : thin;
       ws.getCell(row, 2).border = {top:top, bottom:thin, left:medium, right:thin};
       ws.getCell(row, 3).border = {top:top, bottom:thin, left:thin, right:medium};
     }
-    // Fila 10: Clasificación (combinada B:C)
-    ws.getCell(start+10, 2).border = {top:thin, bottom:thin, left:medium, right:medium};
-    // Fila 11: "Observaciones" (combinada B:C)
+    // Fila 11: Clasificación (combinada B:C)
     ws.getCell(start+11, 2).border = {top:thin, bottom:thin, left:medium, right:medium};
-    // Filas 12-15: área de observaciones (combinada B13:C16) — borde inferior grueso
-    ws.getCell(start+12, 2).border = {top:thin, bottom:medium, left:medium, right:medium};
+    // Fila 12: "Observaciones" (combinada B:C)
+    ws.getCell(start+12, 2).border = {top:thin, bottom:thin, left:medium, right:medium};
+    // Filas 13-16: área de observaciones (combinada) — borde inferior grueso
+    ws.getCell(start+13, 2).border = {top:thin, bottom:medium, left:medium, right:medium};
 
     // Alturas de fila
-    ws.getRow(start).height = 20;     // título
-    ws.getRow(start+9).height = 19;   // puntaje total
+    ws.getRow(start).height = 20;      // título
+    ws.getRow(start+10).height = 19;   // puntaje total
 
     // Fila en blanco de separación entre fichas
     r++;
