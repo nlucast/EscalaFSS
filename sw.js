@@ -1,4 +1,4 @@
-const CACHE = 'fss-v4';
+const CACHE = 'fss-v5';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './xlsx.min.js', './exceljs.min.js'];
 
 self.addEventListener('install', e => {

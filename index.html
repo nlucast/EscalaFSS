@@ -248,7 +248,8 @@ var state = {
   records: safeJSON('fss_records', []),
   activeTab: 'eval',
   form: defaultForm(),
-  expandedId: null
+  expandedId: null,
+  editingId: null
 };
 
 function safeJSON(key, def) {
@@ -329,6 +330,10 @@ function renderEval() {
   var f = state.form;
   var html = '';
 
+  if (state.editingId) {
+    html += '<div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:12px;padding:10px 14px;font-size:.8rem;font-weight:600;display:flex;align-items:center;gap:8px">✏️ Estás editando una evaluación guardada</div>';
+  }
+
   html += '<div class="card"><div class="card-body" style="display:flex;flex-direction:column;gap:12px">';
   html += '<div class="form-group centered"><label class="form-label">Nombre del paciente</label>'+
           '<input class="form-input" type="text" placeholder="Apellido y nombre" value="'+escHtml(f.nombre)+'" onchange="formSet(\'nombre\',this.value)"></div>';
@@ -385,8 +390,13 @@ function renderEval() {
   html += '<div class="form-group"><label class="form-label">Observaciones</label>'+
           '<textarea class="form-input" placeholder="Notas adicionales (opcional)" onchange="formSet(\'observaciones\',this.value)">'+escHtml(f.observaciones)+'</textarea></div>';
 
-  html += '<button class="btn btn-primary" id="btn-save" onclick="saveRecord()"'+(total===null?' disabled':'')+'>💾 Guardar evaluación</button>';
-  html += '<button class="btn btn-secondary" onclick="resetForm()">Limpiar formulario</button>';
+  if (state.editingId) {
+    html += '<button class="btn btn-primary" id="btn-save" onclick="saveRecord()"'+(total===null?' disabled':'')+'>💾 Guardar cambios</button>';
+    html += '<button class="btn btn-secondary" onclick="cancelEdit()">Cancelar edición</button>';
+  } else {
+    html += '<button class="btn btn-primary" id="btn-save" onclick="saveRecord()"'+(total===null?' disabled':'')+'>💾 Guardar evaluación</button>';
+    html += '<button class="btn btn-secondary" onclick="resetForm()">Limpiar formulario</button>';
+  }
 
   document.getElementById('eval-container').innerHTML = html;
 }
@@ -433,15 +443,39 @@ function resetForm() {
   state.form = defaultForm();
   renderEval();
 }
+function cancelEdit() {
+  state.editingId = null;
+  state.form = defaultForm();
+  setTab('records');
+}
+// Carga una evaluación guardada en el formulario para editarla
+function editRecord(id) {
+  var r = null;
+  for (var i=0;i<state.records.length;i++) { if (state.records[i].id===id) { r = state.records[i]; break; } }
+  if (!r) return;
+  state.form = {
+    nombre: r.nombre, dni: r.dni, fecha: r.fecha,
+    tipo: recTipo(r), observaciones: r.observaciones || '',
+    scores: {
+      estadoMental: r.scores.estadoMental,
+      sensorial: r.scores.sensorial,
+      comunicacion: r.scores.comunicacion,
+      funcionMotora: r.scores.funcionMotora,
+      alimentacion: r.scores.alimentacion,
+      respiratorio: r.scores.respiratorio
+    },
+    editing: {}
+  };
+  state.editingId = id;
+  setTab('eval');
+}
 function saveRecord() {
   var f = state.form;
   if (!f.nombre.trim()) { alert('Ingresá el nombre del paciente.'); return; }
   var total = computeTotal(f.scores);
   if (total===null) { alert('Completá los 6 dominios de la escala.'); return; }
   var c = classify(total);
-  state.records.unshift({
-    id: uid(),
-    createdAt: Date.now(),
+  var rec = {
     fecha: f.fecha,
     tipo: f.tipo || 'ingreso',
     nombre: f.nombre.trim(),
@@ -458,7 +492,26 @@ function saveRecord() {
     clasificacion: c.label,
     clsKey: c.cls,
     observaciones: f.observaciones.trim()
-  });
+  };
+
+  if (state.editingId) {
+    // Actualizar registro existente (conserva id y fecha de creación)
+    for (var i=0;i<state.records.length;i++) {
+      if (state.records[i].id===state.editingId) {
+        rec.id = state.records[i].id;
+        rec.createdAt = state.records[i].createdAt;
+        rec.updatedAt = Date.now();
+        state.records[i] = rec;
+        break;
+      }
+    }
+    state.editingId = null;
+  } else {
+    rec.id = uid();
+    rec.createdAt = Date.now();
+    state.records.unshift(rec);
+  }
+
   save('fss_records', state.records);
   state.form = defaultForm();
   setTab('records');
@@ -512,7 +565,10 @@ function renderRecordCard(r) {
   if (r.observaciones) {
     html += '<div class="detail-row" style="flex-direction:column;gap:2px"><span>Observaciones</span><b style="text-align:left;font-weight:500">'+escHtml(r.observaciones)+'</b></div>';
   }
-  html += '<div class="record-actions"><button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">🗑️ Eliminar</button></div>';
+  html += '<div class="record-actions">'+
+          '<button class="btn btn-secondary" onclick="editRecord(\''+r.id+'\')">✏️ Editar</button>'+
+          '<button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">🗑️ Eliminar</button>'+
+          '</div>';
   html += '</div>';
   html += '</div>';
   return html;
