@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Escala FSS" />
-  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f3f4f6;min-height:100vh}
@@ -249,7 +249,8 @@ var state = {
   activeTab: 'eval',
   form: defaultForm(),
   expandedId: null,
-  editingId: null
+  editingId: null,
+  search: ''
 };
 
 function safeJSON(key, def) {
@@ -474,6 +475,10 @@ function saveRecord() {
   if (!f.nombre.trim()) { alert('Ingresá el nombre del paciente.'); return; }
   var total = computeTotal(f.scores);
   if (total===null) { alert('Completá los 6 dominios de la escala.'); return; }
+  // Aviso de fecha futura (probable error de tipeo); permite continuar
+  if (f.fecha > new Date().toISOString().slice(0,10)) {
+    if (!confirm('La fecha ('+fmtDate(f.fecha)+') es posterior a hoy. ¿Guardar igual?')) return;
+  }
   var c = classify(total);
   var rec = {
     fecha: f.fecha,
@@ -512,6 +517,7 @@ function saveRecord() {
     state.records.unshift(rec);
   }
 
+  sortRecords();
   save('fss_records', state.records);
   state.form = defaultForm();
   setTab('records');
@@ -520,11 +526,16 @@ function saveRecord() {
 // ══════════════════════════════════════════
 //  RENDER — REGISTROS
 // ══════════════════════════════════════════
+var importBtnHtml = '<label class="btn btn-secondary" style="cursor:pointer;display:block;text-align:center;margin-top:8px">'+
+  '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">⬆️ Importar pacientes (Excel)</label>';
+
 function renderRecords() {
   var html = '';
 
   if (!state.records.length) {
     html += '<div class="empty"><div class="ico">📋</div><p>Todavía no guardaste evaluaciones.<br>Completá la pestaña Evaluación para agregar la primera.</p></div>';
+    html += importBtnHtml;
+    html += '<p style="font-size:.7rem;color:#9ca3af;text-align:center;margin-top:10px;line-height:1.5">Podés recuperar pacientes desde un Excel exportado con el botón <b>Tabla</b>.</p>';
     document.getElementById('records-container').innerHTML = html;
     return;
   }
@@ -533,15 +544,56 @@ function renderRecords() {
           '<button class="btn btn-primary" onclick="exportFicha()">⬇️ Fichas</button>'+
           '<button class="btn btn-primary" onclick="exportExcel()">⬇️ Tabla</button>'+
           '</div>';
+  html += importBtnHtml;
 
-  state.records.forEach(function(r) { html += renderRecordCard(r); });
+  html += '<input class="form-input" type="text" style="margin-top:4px" placeholder="🔍 Buscar por nombre o DNI" value="'+escHtml(state.search)+'" oninput="setSearch(this.value)">';
+  html += '<div id="records-list"></div>';
 
   html += '<button class="btn btn-danger" style="margin-top:8px" onclick="deleteAllRecords()">🗑️ Borrar todos los registros</button>';
+  html += '<p style="font-size:.7rem;color:#9ca3af;text-align:center;margin-top:6px;line-height:1.5">🔒 Los datos se guardan solo en este dispositivo. Evitá usar la app en equipos compartidos y hacé respaldos con <b>Exportar</b>.</p>';
 
   document.getElementById('records-container').innerHTML = html;
+  renderRecordsList();
+}
+
+function filteredRecords() {
+  var q = norm(state.search);
+  if (!q) return state.records;
+  return state.records.filter(function(r) {
+    return norm(r.nombre).indexOf(q) > -1 || norm(r.dni).indexOf(q) > -1;
+  });
+}
+function renderRecordsList() {
+  var el = document.getElementById('records-list');
+  if (!el) return;
+  var recs = filteredRecords();
+  if (!recs.length) {
+    el.innerHTML = '<div class="empty" style="padding:32px 16px"><p>Sin resultados para "'+escHtml(state.search)+'".</p></div>';
+    return;
+  }
+  var html = '';
+  recs.forEach(function(r) { html += renderRecordCard(r); });
+  el.innerHTML = html;
+}
+function setSearch(v) {
+  state.search = v;
+  renderRecordsList();
 }
 
 function recTipo(r) { return r.tipo==='egreso' ? 'egreso' : 'ingreso'; }
+// Ordena los registros por fecha de evaluación (más reciente primero)
+function sortRecords() {
+  state.records.sort(function(a,b) {
+    if (a.fecha !== b.fecha) return a.fecha < b.fecha ? 1 : -1;
+    return (b.createdAt||0) - (a.createdAt||0);
+  });
+}
+// Normaliza texto para búsqueda/encabezados (sin acentos, minúsculas)
+function norm(s) {
+  s = String(s==null?'':s).trim().toLowerCase();
+  try { s = s.normalize('NFD').replace(/[̀-ͯ]/g,''); } catch(e) {}
+  return s;
+}
 
 // Tarjeta individual de una evaluación (con chip Ingreso/Egreso)
 function renderRecordCard(r) {
@@ -576,7 +628,7 @@ function renderRecordCard(r) {
 
 function toggleExpand(id) {
   state.expandedId = state.expandedId===id ? null : id;
-  renderRecords();
+  renderRecordsList();
 }
 function deleteRecord(id) {
   if (!confirm('¿Eliminar este registro? Esta acción no se puede deshacer.')) return;
@@ -591,6 +643,97 @@ function deleteAllRecords() {
   state.expandedId = null;
   save('fss_records', state.records);
   renderRecords();
+}
+
+// Convierte dd/mm/aaaa -> ISO (aaaa-mm-dd); null si no es válida
+function parseDMY(s) {
+  var m = String(s==null?'':s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  var dd=m[1].padStart(2,'0'), mm=m[2].padStart(2,'0'), yyyy=m[3];
+  var dt=new Date(+yyyy,+mm-1,+dd);
+  if (dt.getFullYear()==+yyyy && dt.getMonth()==+mm-1 && dt.getDate()==+dd) return yyyy+'-'+mm+'-'+dd;
+  return null;
+}
+// Importa pacientes desde un Excel con el formato de la exportación "Tabla"
+function importExcel(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      var ws = wb.Sheets['Evaluaciones FSS'] || wb.Sheets[wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+
+      // Buscar fila de encabezados (la que tiene "Nombre")
+      var hi = -1;
+      for (var i=0;i<aoa.length;i++) {
+        var row = aoa[i] || [];
+        for (var j=0;j<row.length;j++) { if (norm(row[j])==='nombre') { hi=i; break; } }
+        if (hi>-1) break;
+      }
+      if (hi<0) { alert('No reconocí el formato. Subí un Excel exportado con el botón "Tabla".'); input.value=''; return; }
+
+      // Mapear columnas por nombre de encabezado (tolera columnas faltantes/reordenadas)
+      var H = {}, hdr = aoa[hi];
+      for (var k=0;k<hdr.length;k++) {
+        var n = norm(hdr[k]);
+        if (n==='fecha') H.fecha=k;
+        else if (n==='nombre') H.nombre=k;
+        else if (n.indexOf('dni')>-1) H.dni=k;
+        else if (n==='tipo') H.tipo=k;
+        else if (n==='estado mental') H.estadoMental=k;
+        else if (n==='sensorial') H.sensorial=k;
+        else if (n==='comunicacion') H.comunicacion=k;
+        else if (n==='funcion motora') H.funcionMotora=k;
+        else if (n==='alimentacion') H.alimentacion=k;
+        else if (n==='respiratorio') H.respiratorio=k;
+        else if (n==='observaciones') H.observaciones=k;
+      }
+      var domKeys = ['estadoMental','sensorial','comunicacion','funcionMotora','alimentacion','respiratorio'];
+
+      var imported = [], omitted = 0, today = new Date().toISOString().slice(0,10);
+      for (var ri=hi+1; ri<aoa.length; ri++) {
+        var row = aoa[ri] || [];
+        var nombre = String(row[H.nombre]==null?'':row[H.nombre]).trim();
+        if (!nombre) { continue; } // fila vacía: ignorar sin contar
+        var scores = {}, ok = true;
+        for (var d=0; d<domKeys.length; d++) {
+          var v = parseInt(row[H[domKeys[d]]], 10);
+          if (!(v>=1 && v<=5)) { ok=false; break; }
+          scores[domKeys[d]] = v;
+        }
+        if (!ok) { omitted++; continue; }
+        var total = computeTotal(scores), c = classify(total);
+        var fecha = parseDMY(row[H.fecha]) || today;
+        imported.push({
+          id: uid(), createdAt: Date.now(),
+          fecha: fecha,
+          tipo: norm(row[H.tipo])==='egreso' ? 'egreso' : 'ingreso',
+          nombre: nombre,
+          dni: String(row[H.dni]==null?'':row[H.dni]).trim(),
+          scores: scores, total: total, clasificacion: c.label, clsKey: c.cls,
+          observaciones: String(row[H.observaciones]==null?'':row[H.observaciones]).trim()
+        });
+      }
+
+      if (!imported.length) { alert('No encontré evaluaciones válidas para importar.'); input.value=''; return; }
+      if (state.records.length) {
+        if (!confirm('Ya tenés '+state.records.length+' registro(s). Se agregarán '+imported.length+' importado(s).\n\nAviso: si reimportás el mismo archivo, se duplicarán.\n¿Continuar?')) { input.value=''; return; }
+      }
+
+      imported.forEach(function(r){ state.records.push(r); });
+      sortRecords();
+      save('fss_records', state.records);
+      alert('Importados: '+imported.length+(omitted? ('\nOmitidos (datos incompletos): '+omitted) : ''));
+      input.value='';
+      renderRecords();
+    } catch(err) {
+      alert('Error al leer el Excel: '+err.message);
+      input.value='';
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 function exportExcel() {
   if (!state.records.length) { alert('No hay registros para exportar.'); return; }
@@ -742,6 +885,7 @@ function renderScale() {
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
+sortRecords();
 renderNav();
 renderEval();
 

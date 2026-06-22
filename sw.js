@@ -1,5 +1,5 @@
-const CACHE = 'fss-v5';
-const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './xlsx.min.js', './exceljs.min.js'];
+const CACHE = 'fss-v6';
+const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './xlsx.min.js', './exceljs.min.js'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
